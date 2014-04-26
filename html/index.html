@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"> 
+<html> 
+  <head>
+    <title>Please Login...</title>
+    <script type="text/javascript" src="/auth/jsSHA-1.5.0/src/sha1.js"></script>
+    <style>
+      body {
+        background-color: #000;
+        font-family: Arial, sans-serif;
+      }
+
+      .box {
+        position: absolute;
+        background-color: #FFF;
+        border: 2px solid;
+        border-radius: 8px;
+        box-shadow: 3px 3px 2px #333;
+        overflow: hidden;
+      }
+
+      .box>:first-child {
+        background-color: #aaa;
+        width: 100%;
+        text-align: center;
+        padding: 0.5ex;
+        font-weight: bold;
+      }
+
+      .box table {
+        margin: 1ex;
+      }
+
+      .hidden {
+        position: absolute;
+        height: 0px;
+        width: 0px;
+        border: none;
+        padding: 0px;
+        hidefocus: true;
+        tabindex: -1;
+        left: -10000px;
+        top: -10000px;
+      }
+    </style>
+    <script>
+      Login = function() {
+        var challenge = "12345678901234567890123456789012";
+        var saltMap = { };
+        return that = {
+          init: function() {
+            that.centerBox();
+            window.onresize = that.centerBox;
+            document.getElementsByName('sso_auth_user')[0].onblur = that.getSaltRequest();
+          },
+          centerBox: function() {
+            var box = document.getElementsByClassName('box')[0];
+            var pageWidth  = window.innerWidth ||
+                             document.documentElement.clientWidth ||
+                             document.getElementsByTagName('body')[0].clientWidth;
+            var pageHeight = window.innerHeight ||
+                             document.documentElement.clientHeight ||
+                             document.getElementsByTagName('body')[0].clientHeight;
+            box.style.left = ((pageWidth  - box.offsetWidth )/2).toFixed(0) + 'px';
+            box.style.top  = ((pageHeight - box.offsetHeight)/3).toFixed(0) + 'px';
+          },
+          base64ToHex: function(b64)  {
+            b64 = b64.replace(/\=/g, '');
+            var ret = ''; for (var i = 0; i < b64.length; i += 4) {
+              var part = b64.substr(i, 4);
+              var tmp = 0; for (var j = 0; j < part.length; ++j) {
+                tmp |= 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.
+                       indexOf(part[j]) << (18 - (6*j));
+              }
+              for (j = 2*(part.length - 1); --j >= 0; ) {
+                ret += '0123456789abcdef'[(tmp >>> (j*4)) & 0xF];
+              }
+            }
+            return ret;
+          },
+          hexToBase64: function(hex) {
+            var ret = '';
+            var len = hex.length;
+            hex += '0000';
+            for (var i = 0; i < len; i += 6) {
+              var num = parseInt(hex.substr(i, 6), 16);
+              for (var j = 0; j < 4; ++j) {
+                if (i + 2*j <= len) {
+                  ret += 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+                         [(num >>> (6*(3 - j))) & 0x3F];
+                } else {
+                  ret += '=';
+                }
+              }
+            }
+            return ret;
+          },
+          addHex: function(a, b) {
+            var ret = "";
+            for (var i = 0; i < Math.min(a.length, b.length); i += 2) {
+              var num = (parseInt(a.substr(i, 2), 16) +
+                         parseInt(b.substr(i, 2), 16)) & 0xFF;
+              ret += '0123456789ABCDEF'[num >>> 4];
+              ret += '0123456789ABCDEF'[num & 0xF];
+            }
+            if (i < a.length) {
+              ret += a.substr(i);
+            } else {
+              ret += b.substr(i);
+            }
+            return ret;
+          },
+          getSaltRequest: function(cb) {
+            var input = document.getElementsByName('sso_auth_user')[0];
+            var user  = input.value;
+            if (!user) {
+              return;
+            }
+            var salt  = saltMap[user];
+            if (salt) {
+              if (cb) {
+                cb(user, salt);
+              }
+            } else {
+              var request = new XMLHttpRequest();
+              request.open('POST', '', true);
+              request.setRequestHeader('Content-Type',
+                                       'application/x-www-form-urlencoded');
+              request.onreadystatechange = function() {
+                if (request.readyState === 4 && request.status === 200) {
+                  salt = request.getResponseHeader('X-Salt');
+                  if (salt) {
+                    saltMap[user] = salt;
+                    if (cb && user === input.value) {
+                      cb(user, saltMap[user]);
+                    }
+                  }
+                }
+              };
+              request.send('sso_salt_request=' + encodeURIComponent(user));
+            }
+          },
+          submit: function(form) {
+            if (!challenge) {
+              alert('Server did not provide required information; login impossible');
+              return false;
+            }
+
+            that.getSaltRequest(function(password) {
+              return function(user, salt) {
+                var hash1 = new jsSHA(password, 'TEXT').
+                            getHMAC(salt, 'TEXT', 'SHA-1', 'HEX');
+                var hash2 = new jsSHA(hash1, 'HEX').getHash('SHA-1', 'HEX');
+                var hash3 = new jsSHA(hash2, 'HEX').getHMAC(challenge, 'B64', 'SHA-1', 'HEX');
+                var hash4 = that.hexToBase64(that.addHex(hash3, hash1));
+                var request = new XMLHttpRequest();
+                request.open('POST', '', true);
+                request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                request.onreadystatechange = function() {
+                  if (request.readyState === 4 && request.status === 200) {
+                    location.reload();
+                  }
+                }
+                request.send('sso_auth_user=' + encodeURIComponent(user) +
+                             '&sso_auth_challenge=' + encodeURIComponent(challenge) +
+                             '&sso_auth_password_hash=' + encodeURIComponent(hash4));
+              }; }(document.getElementsByName('sso_auth_password')[0].value));
+            document.getElementsByName('sso_auth_password')[0].value = '';
+            return false;
+          },
+        };
+      }();
+    </script>
+  </head>
+  <body onload="Login.init()">
+    <div class="box">
+      <div>Login Required</div>
+      <table>
+        <form action="" method="post" onsubmit="return Login.submit(this)">
+          <tr><td>Username:</td><td><input type="text" name="sso_auth_user" autofocus /></td></tr>
+          <tr><td>Password:</td><td><input type="password" name="sso_auth_password" /></td></tr>
+        </table>
+        <input type="submit" class="hidden">
+      </form>
+    </div>
+  </body>
+</html>

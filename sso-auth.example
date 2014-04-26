@@ -1,0 +1,6 @@
+# TAB separated entries for "user", "password", and "realm".
+# The "realm" field can have multiple comma-separated values.
+# (e.g. payments,mail,private).
+#
+# A valid entry for a new user account can be computed by running
+# "make password" and interactively answering the questions.
