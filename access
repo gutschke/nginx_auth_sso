@@ -88,10 +88,14 @@ function ExtendCookieDuration(realm, force)
     realms = realms:sub(2, -1)
     if realms ~= "" then
       realms = ngx.encode_base64(ngx.hmac_sha1(key, realms) .. realms)
+      local cookie = "SSOAuth=" .. realms .. "; path=/" .. "; HttpOnly"
+      if ngx.var.scheme == "https" then
+        cookie = cookie .. "; secure"
+      end
       if not force then
-        ngx.var.sso_set_cookie = "SSOAuth=" .. realms .. "; path=/"
+        ngx.ctx.sso_set_cookie = cookie
       else
-        ngx.header["Set-Cookie"] = "SSOAuth=" .. realms .. "; path=/"
+        ngx.header["Set-Cookie"] = cookie
       end
     end
   end
