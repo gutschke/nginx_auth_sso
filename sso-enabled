@@ -1,5 +1,4 @@
-set $sso_set_cookie "";
 access_by_lua_file /usr/share/nginx/auth/access;
-header_filter_by_lua "if ngx.var.sso_set_cookie ~= '' then
-                        ngx.header['Set-Cookie'] = ngx.var.sso_set_cookie
+header_filter_by_lua "if ngx.ctx.sso_set_cookie and ngx.ctx.sso_set_cookie ~= '' then
+                        ngx.header['Set-Cookie'] = ngx.ctx.sso_set_cookie
                       end";
