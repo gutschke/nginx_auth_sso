@@ -92,12 +92,13 @@ In order to authenticate the user, the server verifies that the
 following condition holds:
 
         HASH($response - HMAC($password_entry, $challenge)) == $password_entry
+
     <=> HASH(HMAC($password, $salt) + HMAC(HASH(HMAC($password, $salt)), $challenge)
                                     - HMAC(HASH(HMAC($password, $salt)), $challenge)) ==
         HASH(HMAC($password, $salt))
     <=> HASH(HMAC($password, $salt)) == HASH(HMAC($password, $salt))
 
-This makes sure that the server never needs access to the plain test
+This makes sure that the server never needs access to the plain text
 password, nor does it have access to a password-equivalent value.
 
 Furthermore, the client never sends a password or a password-equivalent
