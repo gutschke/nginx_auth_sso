@@ -12,16 +12,13 @@ Copy all the files from this folder to /usr/share/nginx/auth
 Add the following line to your nginx configuration to enable
 authentication support for a given server:
 
+    include /usr/share/nginx/auth/init-auth.conf;
+
     server {
       ...
-      set $sso_secret "SOME-ARBITRARY-RANDOM-STRING";
-      include /usr/share/nginx/auth/auth.cfg;
+      include /usr/share/nginx/auth/auth.conf;
       ...
     }
-
-A good way to generate $sso_secret is
-
-    dd if=/dev/urandom count=1 2>&1|sha1sum
 
 For each location that should be protected by the authentication script,
 add the following lines:
@@ -55,12 +52,12 @@ SSO implementation should always enforce HTTPS encryption.
 
 Unencrypted traffic opens up a variety of different attack vectors.
 
-Ideally, the $sso_secret and the contents of the /etc/sso-auth file must
-remain protected from other users and other programs.  Depending on how
-nginx is configured, this might not actually be possible (e.g. all CGI and
-LUA scripts often run with the same permissions and can thus access
-/etc/sso-auth; they also typically have access to server variables such
-as $sso_secret).
+Ideally, the contents of the /etc/sso-auth file must remain protected
+from other users and other programs.  Depending on how nginx is
+configured, this might not actually be possible (e.g. all CGI and LUA
+scripts often run with the same permissions and can thus access
+/etc/sso-auth; they also typically have access to server variables
+such as the signing key in ngx.shared.sso:get("secret")).
 
 If this data cannot effectively be protected, the security of the SSO
 code is significantly weakened, although SSL encryption can mitigate
@@ -69,9 +66,7 @@ some but not all of the problems.
 A dedicated secure SSO proxy server is probably the best solution. But
 if SSO cannot be moved to a dedicated server, at the very least, you
 should change the permissions on /etc/sso-auth so that the file is
-read-only and only accessible by the www-data group. You should also
-make sure that the nginx configuration file containing the $sso_secret
-is only readable by root.
+read-only and only accessible by the www-data group.
 
 
 Algorithms
@@ -82,8 +77,10 @@ together with a password hash that is computed as:
 
     password_entry := HASH(HMAC($password, $salt))
 
-When a user tries to log in, we provide the browser with the $salt value
-and with a signed timestamp that serves as a $challenge:
+When a user tries to log in, we provide the browser with the $salt
+value and with a signed timestamp that serves as a $challenge; the
+$sso_secret signing key is an arbitrary random string and
+automatically generated when nginx starts:
 
     challenge := HMAC($current_time, $sso_secret)
 

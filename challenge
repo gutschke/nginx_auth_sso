@@ -1,7 +1,7 @@
 -- Retrieve global "secret" to be used for signing
 local key = ngx.shared.sso:get("secret")
 if not key or key == "" then
-  ngx.log(ngx.ERR, "Caller did not set $sso_secret")
+  ngx.log(ngx.ERR, "sso:secret was not initialized by init-auth.conf")
   return ngx.exit(ngx.ERROR)
 end
 
