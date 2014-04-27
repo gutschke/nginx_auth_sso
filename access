@@ -1,9 +1,9 @@
 local SESSION_TIMEOUT = 60*60
 local LOGIN_TIMEOUT   = 15*60
 
--- The caller provides the secret key that signs both the timestamp and
--- the realm.
-local key = ngx.var.sso_secret;
+-- Retrieve global "secret" to be used for signing
+local key = ngx.shared.sso:get("secret")
+ngx.log(ngx.ERR, "GLOBAL SECRET: " .. key)
 if not key or key == "" then
   ngx.log(ngx.ERR, "Caller did not set $sso_secret")
   return ngx.exit(ngx.ERROR)
