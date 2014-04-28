@@ -54,60 +54,67 @@ function ReadSSO(user)
 end
 
 -- Retrieve cookie value as table
-function GetCookieValue()
-  local auth = { }
+function GetSSOCookie()
   local cookie = ngx.var.cookie_SSOAuth
   if cookie then
-    local hmac, realms = ngx.decode_base64(cookie):
-                         match("^(" .. string.rep(".", 20) .. ")(.*)$")
+    local hmac, tm_raw, realms = ngx.decode_base64(cookie):
+       match("^(" .. string.rep(".", 20) .. ")(....)(.*)$")
     if hmac and hmac ~= "" and realms and realms ~= "" and
-       ngx.hmac_sha1(key, realms) == hmac then
-      for tm_raw, r in realms:gmatch("(....)([^%z]+)%z?") do
-        local diff = ngx.time() - RawToTime(tm_raw)
-        if diff >= 0 and diff < SESSION_TIMEOUT then
-          auth[r] = tm_raw
-        end
+       ngx.hmac_sha1(key, tm_raw .. realms) == hmac then
+      local diff = ngx.time() - RawToTime(tm_raw)
+      if diff >= 0 and diff < SESSION_TIMEOUT then
+        return realms
       end
     end
   end
-  return auth
+  return nil
 end
 
--- Extend the time that the user is logged into this realm
-function ExtendCookieDuration(realm, force)
-  local auth = GetCookieValue()
-  local authorized = (auth[realm] ~= nil)
-
-  if authorized or force then
-    auth[realm] = TimeToRaw(ngx.time())
-    local realms = ""
-    for r, tm_raw in pairs(auth) do
-      realms = realms .. "\000" .. tm_raw .. r
+-- Set the cookie after adding a timestamp and signature
+function SetSSOCookie(realms, force)
+  if realms and realms ~= "" then
+    local tm_raw = TimeToRaw(ngx.time())
+    realms = tm_raw .. realms
+    local cookie =
+      "SSOAuth=" ..
+      ngx.encode_base64(ngx.hmac_sha1(key, realms) .. realms) ..
+      "; path=/" .. "; HttpOnly"
+    if ngx.var.scheme == "https" then
+      cookie = cookie .. "; secure"
     end
-    realms = realms:sub(2, -1)
-    if realms ~= "" then
-      realms = ngx.encode_base64(ngx.hmac_sha1(key, realms) .. realms)
-      local cookie = "SSOAuth=" .. realms .. "; path=/" .. "; HttpOnly"
-      if ngx.var.scheme == "https" then
-        cookie = cookie .. "; secure"
-      end
-      if not force then
-        ngx.ctx.sso_set_cookie = cookie
-      else
-        ngx.header["Set-Cookie"] = cookie
-      end
+    if force then
+      ngx.header['Set-Cookie'] = cookie
+    else
+      ngx.ctx.sso_set_cookie = cookie
     end
   end
-  return authorized
+end
+
+-- Extend the time that the user is logged into the SSO system
+function ExtendCookieDuration(realm)
+  local realms = GetSSOCookie()
+  if realms and realms ~= "" then
+    ngx.log(ngx.ERR, "Cookie is currently set to: " .. realms)
+    for s in realms:gmatch("[^,]+") do
+      if realm == s then
+        SetSSOCookie(realms)
+        return true
+      end
+    end
+  else
+    ngx.log(ngx.ERR, "Cookie is not valid")
+  end
+  return false
 end
 
 -- If the user has a valid cookie, allow the request
-if ExtendCookieDuration(realm, false) then
+if ExtendCookieDuration(realm) then
   return ngx.exit(ngx.OK)
 end
 
 -- The user submitted a user id and password. Verify the provided information
 -- and then decide whether to allow the request.
+ngx.log(ngx.ERR, "method: " .. ngx.req.get_method())
 if ngx.req.get_method() == "POST" then
   repeat
     -- Read POST arguments. This includes user id, hashed password, and other
@@ -130,6 +137,7 @@ if ngx.req.get_method() == "POST" then
       return ngx.exit(200)
     end
 
+ngx.log(ngx.ERR, "checking parameters")
     -- Make sure we got all the arguments that we need to make a decision
     user = args["sso_auth_user"]
     local challenge = args["sso_auth_challenge"]
@@ -140,6 +148,7 @@ if ngx.req.get_method() == "POST" then
       break
     end
 
+ngx.log(ngx.ERR, "checking signature")
     -- Check signature on signed "challenge"
     local tm_raw, tm_hmac = ngx.decode_base64(challenge):match("(....)(.*)")
     if ngx.hmac_sha1(key, tm_raw) ~= tm_hmac then break end
@@ -151,9 +160,11 @@ if ngx.req.get_method() == "POST" then
       break
     end
 
+ngx.log(ngx.ERR, "reading sso-auth")
     -- Read "sso-auth" file
     local u, h, r = ReadSSO(user)
     if u == user then
+ngx.log(ngx.ERR, "checking password")
       -- Check if the password matches.
       local salt, hash = h:match("([^:]*):(.*)")
       local dat1 = ngx.hmac_sha1(ngx.decode_base64(challenge), ngx.decode_base64(hash))
@@ -163,12 +174,14 @@ if ngx.req.get_method() == "POST" then
         data = data .. string.char((256 + dat2:byte(i) - dat1:byte(i)) % 256)
       end
       if ngx.encode_base64(ngx.sha1_bin(data)) == hash then
+ngx.log(ngx.ERR, "checking realm")
         -- Check if the user has access to this particular "realm"
         for s in r:gmatch("[^,]+") do
           if realm == s then
+ngx.log(ngx.ERR, "User authenticated; logging into: \"" .. r .. "\"")
             -- The user provided a correct user id and password for this realm;
-            -- allow the request.
-            ExtendCookieDuration(realm, true)
+            -- allow the request; and also log the user into all of his realms.
+            SetSSOCookie(r, true)
             return ngx.exit(ngx.HTTP_OK)
           end
         end
