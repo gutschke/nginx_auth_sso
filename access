@@ -94,15 +94,12 @@ end
 function ExtendCookieDuration(realm)
   local realms = GetSSOCookie()
   if realms and realms ~= "" then
-    ngx.log(ngx.ERR, "Cookie is currently set to: " .. realms)
     for s in realms:gmatch("[^,]+") do
       if realm == s then
         SetSSOCookie(realms)
         return true
       end
     end
-  else
-    ngx.log(ngx.ERR, "Cookie is not valid")
   end
   return false
 end
@@ -114,7 +111,6 @@ end
 
 -- The user submitted a user id and password. Verify the provided information
 -- and then decide whether to allow the request.
-ngx.log(ngx.ERR, "method: " .. ngx.req.get_method())
 if ngx.req.get_method() == "POST" then
   repeat
     -- Read POST arguments. This includes user id, hashed password, and other
@@ -137,7 +133,6 @@ if ngx.req.get_method() == "POST" then
       return ngx.exit(200)
     end
 
-ngx.log(ngx.ERR, "checking parameters")
     -- Make sure we got all the arguments that we need to make a decision
     user = args["sso_auth_user"]
     local challenge = args["sso_auth_challenge"]
@@ -148,7 +143,6 @@ ngx.log(ngx.ERR, "checking parameters")
       break
     end
 
-ngx.log(ngx.ERR, "checking signature")
     -- Check signature on signed "challenge"
     local tm_raw, tm_hmac = ngx.decode_base64(challenge):match("(....)(.*)")
     if ngx.hmac_sha1(key, tm_raw) ~= tm_hmac then break end
@@ -160,11 +154,9 @@ ngx.log(ngx.ERR, "checking signature")
       break
     end
 
-ngx.log(ngx.ERR, "reading sso-auth")
     -- Read "sso-auth" file
     local u, h, r = ReadSSO(user)
     if u == user then
-ngx.log(ngx.ERR, "checking password")
       -- Check if the password matches.
       local salt, hash = h:match("([^:]*):(.*)")
       local dat1 = ngx.hmac_sha1(ngx.decode_base64(challenge), ngx.decode_base64(hash))
@@ -174,11 +166,9 @@ ngx.log(ngx.ERR, "checking password")
         data = data .. string.char((256 + dat2:byte(i) - dat1:byte(i)) % 256)
       end
       if ngx.encode_base64(ngx.sha1_bin(data)) == hash then
-ngx.log(ngx.ERR, "checking realm")
         -- Check if the user has access to this particular "realm"
         for s in r:gmatch("[^,]+") do
           if realm == s then
-ngx.log(ngx.ERR, "User authenticated; logging into: \"" .. r .. "\"")
             -- The user provided a correct user id and password for this realm;
             -- allow the request; and also log the user into all of his realms.
             SetSSOCookie(r, true)
