@@ -1,4 +1,4 @@
-access_by_lua_file /usr/share/nginx/auth/access;
-header_filter_by_lua_file /usr/share/nginx/auth/sso-set-cookie;
-body_filter_by_lua_file /usr/share/nginx/auth/logout-overlay;
+access_by_lua_file /usr/local/openresty/nginx/auth/access;
+header_filter_by_lua_file /usr/local/openresty/nginx/auth/sso-set-cookie;
+body_filter_by_lua_file /usr/local/openresty/nginx/auth/logout-overlay;
       

@@ -1,10 +1,10 @@
 all:
 
 install:
-	@echo "Copying files to /usr/share/nginx/auth and restarting";   \
-	echo "nginx web server...";                                      \
-	sudo sh -ec 'mkdir -p /usr/share/nginx/auth &&                   \
-	             cp -a * /usr/share/nginx/auth/ &&                   \
+	@echo "Copying files to /usr/local/openresty/nginx/auth and restarting"; \
+	echo "nginx web server...";                                              \
+	sudo sh -ec 'mkdir -p /usr/local/openresty/nginx/auth &&                 \
+	             cp -a * /usr/local/openresty/nginx/auth/ &&                 \
 	             /etc/init.d/nginx restart'
 
 password:

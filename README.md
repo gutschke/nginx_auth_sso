@@ -7,16 +7,16 @@ Simple HTML authentication script for nginx (requires LUA)
 Installation instructions
 -------------------------
 
-Copy all the files from this folder to /usr/share/nginx/auth
+Copy all the files from this folder to /usr/local/openresty/nginx/auth
 
 Add the following line to your nginx configuration to enable
 authentication support for a given server:
 
-    include /usr/share/nginx/auth/init-auth.conf;
+    include /usr/local/openresty/nginx/auth/init-auth.conf;
 
     server {
       ...
-      include /usr/share/nginx/auth/auth.conf;
+      include /usr/local/openresty/nginx/auth/auth.conf;
       ...
     }
 
@@ -26,7 +26,7 @@ add the following lines:
     location ... {
       ...
       set $sso_realm "REALM";
-      include /usr/share/nginx/auth/sso-enabled;
+      include /usr/local/openresty/nginx/auth/sso-enabled;
       ...
     }
 
