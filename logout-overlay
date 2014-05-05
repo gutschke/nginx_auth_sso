@@ -2,7 +2,7 @@ if ngx.header.content_type == 'text/html' then
   ngx.arg[1] = ngx.re.sub(ngx.arg[1], "</head>",
       "<style>\
         a.sso_auth_overlay {\
-          background: rgba(255,255,255,0.4) none !important;\
+          background: rgba(240,240,240,0.4) none !important;\
           box-shadow: none !important;\
           color: transparent !important;\
           font-family: Arial, sans-serif !important;\
@@ -20,7 +20,7 @@ if ngx.header.content_type == 'text/html' then
           z-index: 30000 !important;\
         }\
         a.sso_auth_overlay:hover {\
-          background: rgba(255,255,255,0.4) none !important;\
+          background: rgba(240,240,240,0.4) none !important;\
           box-shadow: none !important;\
           color: #000 !important;\
           font-family: Arial, sans-serif !important;\
@@ -41,7 +41,7 @@ if ngx.header.content_type == 'text/html' then
       </style>\
     </head>\
     <a class=\"sso_auth_overlay\" style=\"\
-      background: rgba(255,255,255,0.2) none;\
+      background: rgba(240,240,240,0.2) none;\
       box-shadow: none;\
       color: transparent;\
       font-family: Arial, sans-serif;\

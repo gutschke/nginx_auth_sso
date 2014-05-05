@@ -172,6 +172,7 @@ if ngx.req.get_method() == "POST" then
             -- The user provided a correct user id and password for this realm;
             -- allow the request; and also log the user into all of his realms.
             SetSSOCookie(r, true)
+            ngx.req.set_method(ngx.HTTP_GET)
             return ngx.exit(ngx.HTTP_OK)
           end
         end

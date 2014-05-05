@@ -1,0 +1,3 @@
+if ngx.ctx.sso_set_cookie and ngx.ctx.sso_set_cookie ~= '' then
+  ngx.header['Set-Cookie'] = ngx.ctx.sso_set_cookie
+end
