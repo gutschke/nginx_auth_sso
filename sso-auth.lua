@@ -10,6 +10,17 @@ local function init()
   end
 end
 
+local function addSetCookieHeader(cookie)
+  local cookies = ngx.header['Set-Cookie']
+  if cookies then
+    if type(cookies) ~= "table" then cookies = { cookies } end
+  else
+    cookies = { }
+  end
+  cookies[#cookies + 1] = cookie
+  ngx.header['Set-Cookie'] = cookies
+end
+
 function sso_auth.challenge()
   -- Retrieve global "secret" to be used for signing
   local key = ngx.shared.sso:get("secret")
@@ -41,10 +52,10 @@ function sso_auth.challenge()
     gsub("(challenge%s*=%s*)\"" .. string.rep("%d", 32) .. "\";", "%1" .. tm, 1)
 end
 
-function sso_auth.csrf_protection(url)
-  local ref = ngx.header.referer;
+function sso_auth.csrfProtection(url)
+  local ref = ngx.req.get_headers()["Referer"];
   if ref and not ref:match("^" .. url) then
-    return ngx.redirect(url, false)
+    return ngx.redirect(url, ngx.HTTP_MOVED_TEMPORARILY)
   end
 end
 
@@ -134,7 +145,7 @@ function sso_auth.access()
         cookie = cookie .. "; secure"
       end
       if force then
-        ngx.header['Set-Cookie'] = cookie
+        addSetCookieHeader(cookie)
       else
         ngx.ctx.sso_set_cookie = cookie
       end
@@ -239,24 +250,22 @@ function sso_auth.access()
   return ngx.exec("/auth")
 end
 
-function sso_auth.header_filter()
+function sso_auth.headerFilter()
   if ngx.ctx.sso_set_cookie and ngx.ctx.sso_set_cookie ~= '' then
-    local cookies = ngx.header.set_cookie
-    if cookies then
-      if type(cookies) ~= "table" then cookies = { cookies } end
-    else
-      cookies = { }
-    end
-    cookies[#cookies + 1] = ngx.ctx.sso_set_cookie
-    ngx.header.set_cookie = cookies
+    addSetCookieHeader(ngx.ctx.sso_set_cookie)
+    ngx.ctx.sso_set_cookie = nil
   end
-  if ngx.header.content_type and ngx.header.content_type:find('text/html') then
+  if ngx.header.content_type and
+    (ngx.header.content_type:find('text/html') or
+     ngx.header.content_type:find('application/xhtml[+]xml')) then
     ngx.header.content_length = nil
   end
 end
 
-function sso_auth.body_filter()
-  if ngx.header.content_type and ngx.header.content_type:find('text/html') then
+function sso_auth.bodyFilter()
+  if ngx.header.content_type and
+    (ngx.header.content_type:find('text/html') or
+     ngx.header.content_type:find('application/xhtml[+]xml')) then
     ngx.arg[1] = ngx.re.sub(ngx.arg[1], "</head>",
         "<style>\
           a.sso_auth_overlay {\
