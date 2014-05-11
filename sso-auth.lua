@@ -168,7 +168,7 @@ function sso_auth.access()
   
   -- If the user has a valid cookie, allow the request
   if ExtendCookieDuration(realm) then
-    return ngx.exit(ngx.OK)
+    return
   end
   
   -- The user submitted a user id and password. Verify the provided information
@@ -235,7 +235,7 @@ function sso_auth.access()
               -- allow the request; and also log the user into all of his realms.
               SetSSOCookie(r, true)
               ngx.req.set_method(ngx.HTTP_GET)
-              return ngx.exit(ngx.HTTP_OK)
+              return
             end
           end
         end
@@ -263,6 +263,9 @@ function sso_auth.headerFilter()
 end
 
 function sso_auth.bodyFilter()
+  if ngx.arg[1]:find("<frameset") then
+    return
+  end
   if ngx.header.content_type and
     (ngx.header.content_type:find('text/html') or
      ngx.header.content_type:find('application/xhtml[+]xml')) then
