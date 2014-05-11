@@ -1,0 +1,28 @@
+-- Retrieve global "secret" to be used for signing
+local key = ngx.shared.sso:get("secret")
+if not key or key == "" then
+  ngx.log(ngx.ERR, "sso:secret was not initialized by init-auth.conf")
+  return ngx.exit(ngx.ERROR)
+end
+
+-- Obtain the current time, sign it, and use it as a challenge for the login
+-- web page.
+-- First, convert current time to binary representation.
+local tm = math.abs(ngx.time())
+local raw = ""
+for i = 1, 4 do
+  raw = raw .. string.char(tm % 256)
+  tm = tm / 256
+end
+
+-- Then encode current time and HMAC-SHA1 signature as a single Base64 encoded
+-- string.
+-- This results in a string that is exactly 35 characters long (including
+-- surrounding quotes and semicolon).
+tm = "\"" .. ngx.encode_base64(raw .. ngx.hmac_sha1(key, raw)) .. "\";"
+if tm:len() ~= 35 then return ngx.exit(ngx.ERROR) end
+
+-- Insert the parameter into the HTML source. Try to keep the existing length
+-- of the file, so that we don't need to worry about recomputing Content-Length.
+ngx.arg[1] = ngx.arg[1]:
+  gsub("(challenge%s*=%s*)\"" .. string.rep("%d", 32) .. "\";", "%1" .. tm, 1)
