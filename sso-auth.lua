@@ -10,15 +10,69 @@ local function init()
   end
 end
 
-local function addSetCookieHeader(cookie)
-  local cookies = ngx.header['Set-Cookie']
+function sso_auth.GetRespCookies()
+  local cookies = ngx.header["Set-Cookie"]
   if cookies then
-    if type(cookies) ~= "table" then cookies = { cookies } end
+    if type(cookies) ~= "table" then
+      cookies = { cookies }
+      ngx.header["Set-Cookie"] = cookies
+    end
   else
     cookies = { }
   end
-  cookies[#cookies + 1] = cookie
-  ngx.header['Set-Cookie'] = cookies
+  return cookies
+end
+
+function sso_auth.GetRespCookie(cookie)
+  local cookies = sso_auth.GetRespCookies()
+  local key = cookie:gsub("=.*", "")
+  for i, val in ipairs(cookies) do
+    if key == val:gsub("=.*", "") then
+      return cookies[i], i, cookies
+    end
+  end
+  return nil, #cookies + 1, cookies
+end
+
+function sso_auth.SetCookie(cookie, delay)
+  if delay then
+    local cookies = ngx.ctx.sso_set_cookie
+    if not cookies then
+      cookies = { }
+    end
+    cookies[cookie:gsub("=.*", "")] = cookie:gsub("^[^=]*=", "") 
+    ngx.ctx.sso_set_cookie = cookies
+  else
+    local val, i, cookies = sso_auth.GetRespCookie(cookie)
+    cookies[i] = cookie
+    ngx.header["Set-Cookie"] = cookies
+  end
+end
+
+function sso_auth.ExpireCookie(cookie, delay)
+  sso_auth.SetCookie(cookie:gsub("=.*", "") ..
+                     "=; path=/; expires=Thu, 1 Jan 1970 00:00:00 UTC",
+                     delay)
+end
+
+local function FlattenRespCookies()
+  local delayed = ngx.ctx.sso_set_cookie
+  if not delayed then
+    return
+  end
+  local cookies = sso_auth.GetRespCookies()
+  for i, val in ipairs(cookies) do
+    local k = val:gsub("=.*", "")
+    if not delayed[k] then
+      delayed[k] = val:gsub("^[^=]*=", "")
+    end
+  end
+  cookies = { }
+  for k, v in pairs(delayed) do
+    cookies[#cookies + 1] = k .. "=" .. v
+  end
+  ngx.header["Set-Cookie"] = cookies
+  ngx.ctx.sso_set_cookie = nil
 end
 
 function sso_auth.challenge()
@@ -55,7 +109,9 @@ end
 function sso_auth.csrfProtection(url)
   local ref = ngx.req.get_headers()["Referer"];
   if ref and not ref:match("^" .. url) then
-    return ngx.redirect(url, ngx.HTTP_MOVED_TEMPORARILY)
+    ngx.header["Content-Type"] = "text/html"
+    ngx.header["Refresh"] = "0;URL=" .. url
+    return ngx.exit(200)
   end
 end
 
@@ -144,11 +200,7 @@ function sso_auth.access()
       if ngx.var.scheme == "https" then
         cookie = cookie .. "; secure"
       end
-      if force then
-        addSetCookieHeader(cookie)
-      else
-        ngx.ctx.sso_set_cookie = cookie
-      end
+      sso_auth.SetCookie(cookie, not force)
     end
   end
   
@@ -223,7 +275,7 @@ function sso_auth.access()
         local salt, hash = h:match("([^:]*):(.*)")
         local dat1 = ngx.hmac_sha1(ngx.decode_base64(challenge), ngx.decode_base64(hash))
         local dat2 = ngx.decode_base64(password_hash)
-        local data = ''
+        local data = ""
         for i = 1, #dat1 do
           data = data .. string.char((256 + dat2:byte(i) - dat1:byte(i)) % 256)
         end
@@ -251,13 +303,10 @@ function sso_auth.access()
 end
 
 function sso_auth.headerFilter()
-  if ngx.ctx.sso_set_cookie and ngx.ctx.sso_set_cookie ~= '' then
-    addSetCookieHeader(ngx.ctx.sso_set_cookie)
-    ngx.ctx.sso_set_cookie = nil
-  end
+  FlattenRespCookies()
   if ngx.header.content_type and
-    (ngx.header.content_type:find('text/html') or
-     ngx.header.content_type:find('application/xhtml[+]xml')) then
+    (ngx.header.content_type:find("text/html") or
+     ngx.header.content_type:find("application/xhtml[+]xml")) then
     ngx.header.content_length = nil
   end
 end
@@ -267,8 +316,8 @@ function sso_auth.bodyFilter()
     return
   end
   if ngx.header.content_type and
-    (ngx.header.content_type:find('text/html') or
-     ngx.header.content_type:find('application/xhtml[+]xml')) then
+    (ngx.header.content_type:find("text/html") or
+     ngx.header.content_type:find("application/xhtml[+]xml")) then
     ngx.arg[1] = ngx.re.sub(ngx.arg[1], "</head>",
         "<style>\
           a.sso_auth_overlay {\
