@@ -28,7 +28,7 @@ function sso_auth.GetRespCookie(cookie)
   local key = cookie:gsub("=.*", "")
   for i, val in ipairs(cookies) do
     if key == val:gsub("=.*", "") then
-      return cookies[i], i, cookies
+      return val, i, cookies
     end
   end
   return nil, #cookies + 1, cookies
@@ -40,7 +40,7 @@ function sso_auth.SetCookie(cookie, delay)
     if not cookies then
       cookies = { }
     end
-    cookies[cookie:gsub("=.*", "")] = cookie:gsub("^[^=]*=", "") 
+    cookies[cookie:gsub("=.*", "")] = cookie:gsub("^[^=]*=", "")
     ngx.ctx.sso_set_cookie = cookies
   else
     local val, i, cookies = sso_auth.GetRespCookie(cookie)
