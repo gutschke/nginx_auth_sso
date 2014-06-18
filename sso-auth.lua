@@ -302,12 +302,21 @@ function sso_auth.access()
   return ngx.exec("/auth")
 end
 
-function sso_auth.headerFilter()
+function sso_auth.headerFilter(excl)
   FlattenRespCookies()
   if ngx.header.content_type and
     (ngx.header.content_type:find("text/html") or
      ngx.header.content_type:find("application/xhtml[+]xml")) then
     ngx.header.content_length = nil
+  end
+  if not excl or excl["X-Frame-Options"] == nil or excl["X-Frame-Options"] then
+    ngx.header["X-Frame-Options"] = "SAMEORIGIN"
+  end
+  if not excl or excl["X-Content-Type-Options"] == nil or excl["X-Content-Type-Options"] then
+    ngx.header["X-Content-Type-Options"] = "nosniff"
+  end
+  if not excl or excl["X-XSS-Protection"] == nil or excl["X-XSS-Protection"] then
+    ngx.header["X-XSS-Protection"] = "1; mode=block"
   end
 end
 
@@ -334,7 +343,7 @@ function sso_auth.bodyFilter()
             position: fixed !important;\
             right: 0px !important;\
             text-decoration: none !important;\
-            text-shadow: #fff !important;\
+            text-shadow: #fff 0.1em 0.1em 0.2em !important;\
             top: 0px !important;\
             z-index: 30000 !important;\
           }\
@@ -373,7 +382,7 @@ function sso_auth.bodyFilter()
         position: fixed;\
         right: 0px;\
         text-decoration: none;\
-        text-shadow: #fff;\
+        text-shadow: #fff 0.1em 0.1em 0.2em;\
         top: 0px;\
         z-index: 30000;\" href=\"/logout\" target=\"_top\">Logout</a>");
   end
