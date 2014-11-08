@@ -1,3 +1,9 @@
-access_by_lua 'return sso_auth.access()';
-header_filter_by_lua 'sso_auth.headerFilter()';
-body_filter_by_lua 'sso_auth.bodyFilter()';
+access_by_lua '
+  local sso_auth = require "sso-auth"
+  return sso_auth.access()';
+header_filter_by_lua '
+  local sso_auth = require "sso-auth"
+  sso_auth.headerFilter()';
+body_filter_by_lua '
+  local sso_auth = require "sso-auth"
+  sso_auth.bodyFilter()';

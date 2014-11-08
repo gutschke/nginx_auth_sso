@@ -13,7 +13,6 @@ Add the following line to your nginx configuration to enable
 authentication support for a given server:
 
     lua_shared_dict sso 16k;
-    init_by_lua 'sso_auth = dofile("/usr/local/openresty/nginx/auth/sso-auth.lua")';
 
     server {
       ...
