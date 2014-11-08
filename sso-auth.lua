@@ -82,7 +82,7 @@ function sso_auth.challenge()
     ngx.log(ngx.ERR, "sso:secret was not initialized by init-auth.conf")
     return ngx.exit(ngx.ERROR)
   end
-  
+
   -- Obtain the current time, sign it, and use it as a challenge for the login
   -- web page.
   -- First, convert current time to binary representation.
@@ -92,14 +92,14 @@ function sso_auth.challenge()
     raw = raw .. string.char(tm % 256)
     tm = tm / 256
   end
-  
+
   -- Then encode current time and HMAC-SHA1 signature as a single Base64 encoded
   -- string.
   -- This results in a string that is exactly 35 characters long (including
   -- surrounding quotes and semicolon).
   tm = "\"" .. ngx.encode_base64(raw .. ngx.hmac_sha1(key, raw)) .. "\";"
   if tm:len() ~= 35 then return ngx.exit(ngx.ERROR) end
-  
+
   -- Insert the parameter into the HTML source. Try to keep the existing length
   -- of the file, so that we don't need to worry about recomputing Content-Length.
   ngx.arg[1] = ngx.arg[1]:
@@ -118,14 +118,14 @@ end
 function sso_auth.access()
   local SESSION_TIMEOUT = 60*60
   local LOGIN_TIMEOUT   = 15*60
-  
+
   -- Retrieve global "secret" to be used for signing
   local key = ngx.shared.sso:get("secret")
   if not key or key == "" then
     ngx.log(ngx.ERR, "sso:secret was not initialized by init-auth.conf")
     return ngx.exit(ngx.ERROR)
   end
-  
+
   -- The caller also provides the realm that should be protected by the
   -- SSO authentication.
   local realm = ngx.var.sso_realm;
@@ -133,9 +133,9 @@ function sso_auth.access()
     ngx.log(ngx.ERR, "Caller did not set $sso_realm")
     return ngx.exit(ngx.ERROR)
   end
-  
+
   -- Convert time to four raw bytes
-  function TimeToRaw(tm)
+  local function TimeToRaw(tm)
     tm = math.abs(tm)
     local raw = ""
     for i = 1, 4 do
@@ -144,18 +144,18 @@ function sso_auth.access()
     end
     return raw
   end
-  
+
   -- Convert four raw bytes to time
-  function RawToTime(raw)
+  local function RawToTime(raw)
     local tm0, tm1, tm2, tm3 = raw:byte(1, 4)
     return ((tm3*256 + tm2)*256 + tm1)*256 + tm0
   end
-  
+
   -- Read matching line from "auth-sso" file
-  function ReadSSO(user)
+  local function ReadSSO(user)
     local handle, msg, err = io.open("/etc/sso-auth", "r")
     if not handle then return end
-  
+
     for line in handle:lines() do
       local u,h,r = line:
                     match("([^#]*).*"):
@@ -170,9 +170,9 @@ function sso_auth.access()
     handle:close()
     return
   end
-  
+
   -- Retrieve cookie value as table
-  function GetSSOCookie()
+  local function GetSSOCookie()
     local cookie = ngx.var.cookie_SSOAuth
     if cookie then
       local hmac, tm_raw, realms = ngx.decode_base64(cookie):
@@ -187,9 +187,9 @@ function sso_auth.access()
     end
     return nil
   end
-  
+
   -- Set the cookie after adding a timestamp and signature
-  function SetSSOCookie(realms, force)
+  local function SetSSOCookie(realms, force)
     if realms and realms ~= "" then
       local tm_raw = TimeToRaw(ngx.time())
       realms = tm_raw .. realms
@@ -203,9 +203,9 @@ function sso_auth.access()
       sso_auth.SetCookie(cookie, not force)
     end
   end
-  
+
   -- Extend the time that the user is logged into the SSO system
-  function ExtendCookieDuration(realm)
+  local function ExtendCookieDuration(realm)
     local realms = GetSSOCookie()
     if realms and realms ~= "" then
       for s in realms:gmatch("[^,]+") do
@@ -217,12 +217,12 @@ function sso_auth.access()
     end
     return false
   end
-  
+
   -- If the user has a valid cookie, allow the request
   if ExtendCookieDuration(realm) then
     return
   end
-  
+
   -- The user submitted a user id and password. Verify the provided information
   -- and then decide whether to allow the request.
   if ngx.req.get_method() == "POST" then
@@ -232,7 +232,7 @@ function sso_auth.access()
       ngx.req.read_body()
       local args, err = ngx.req.get_post_args()
       if not args then break end
-  
+
       -- If this was a request for a user's "salt", handle that here.
       local user = args["sso_salt_request"]
       if user then
@@ -246,7 +246,7 @@ function sso_auth.access()
         end
         return ngx.exit(200)
       end
-  
+
       -- Make sure we got all the arguments that we need to make a decision
       user = args["sso_auth_user"]
       local challenge = args["sso_auth_challenge"]
@@ -256,18 +256,18 @@ function sso_auth.access()
          not password_hash or password_hash == "" then
         break
       end
-  
+
       -- Check signature on signed "challenge"
       local tm_raw, tm_hmac = ngx.decode_base64(challenge):match("(....)(.*)")
       if ngx.hmac_sha1(key, tm_raw) ~= tm_hmac then break end
-  
+
       -- Compute time when challenge was issued and reconfirm the password if
       -- the password dialog has expired
       local diff = ngx.time() - RawToTime(tm_raw)
       if diff < 0 or diff >= LOGIN_TIMEOUT then
         break
       end
-  
+
       -- Read "sso-auth" file
       local u, h, r = ReadSSO(user)
       if u == user then
@@ -294,7 +294,7 @@ function sso_auth.access()
       end
     until true
   end
-  
+
   -- The user is (still) unauthenticated. Inject a login page and ask for
   -- credentials.
   ngx.req.set_method(ngx.HTTP_GET)
